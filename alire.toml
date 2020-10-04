@@ -1,0 +1,10 @@
+name = "minirest"
+description = "Shiny new project"
+version = "0.0.0"
+
+authors = ["Al O'Reilly O\"Raro"]
+maintainers = ["Al O'Reilly O\"Raro <alejandro@mosteo.com>"]
+maintainers-logins = ["mosteo"]
+
+[[depends-on]]  # This line was added by `alr with`
+aaa = "*"  # This line was added by `alr with`
