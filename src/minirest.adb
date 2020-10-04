@@ -53,23 +53,16 @@ package body Minirest is
       return To_String (Result);
    end Encode;
 
-   ---------
-   -- "=" --
-   ---------
-
-   function "=" (Key, Value : String) return Parameter is
-   begin
-      return Parameter (Encode (Key) & "=" & Encode (Value));
-   end "=";
-
    -----------
    -- "and" --
    -----------
 
-   function "and" (L : Parameters; R : Parameter) return Parameters is
+   function "and" (L : Parameters; R : Parameters) return Parameters is
    begin
       return Result : Parameters := L do
-         Result.Data.Append (String (R));
+         for I in R.Data.Iterate loop
+            Result.Data.Insert (AAA.Strings.Maps.Key (I), R.Data (I));
+         end loop;
       end return;
    end "and";
 
@@ -77,9 +70,11 @@ package body Minirest is
    -- "=" --
    ---------
 
-   function "=" (L, R : String) return Parameters is
+   function "=" (Key, Value : String) return Parameters is
    begin
-      return (Data => AAA.Strings.To_Vector (String (Parameter'(L = R))));
+      return P : Parameters do
+         P.Data.Insert (Key, Value);
+      end return;
    end "=";
 
    ---------
@@ -89,26 +84,48 @@ package body Minirest is
    Curl : constant OS.String_Access := OS.Locate_Exec_On_Path ("curl");
 
    function Get (URL       : String;
-                 Arguments : Parameters := No_Arguments)
+                 Arguments : Parameters := No_Arguments;
+                 Headers   : Parameters := No_Arguments)
                     return Response
    is
+
+      function To_URL_Args (Map : AAA.Strings.Map) return String is
+         use AAA.Strings.Maps;
+         Flat : AAA.Strings.Vector;
+      begin
+         for I in Map.Iterate loop
+            Flat.Append (Encode (Key (I)) & "=" & Encode (Map (I)));
+         end loop;
+
+         return Flat.Flatten ('&');
+      end To_URL_Args;
+
+      Curl_Args : AAA.Strings.Vector :=
+                    AAA.Strings
+                      .To_Vector ("curl")
+                      .Append ("-v")
+                      .Append ("-i");
    begin
       if Curl in null then
          raise Rest_Error with "Could not find 'curl' tool in path";
       end if;
 
+      --  Add request headers
+
+      for I in Headers.Data.Iterate loop
+         Curl_Args.Append ("-H");
+         Curl_Args.Append (AAA.Strings.Maps.Key (I) & ": " & Headers.Data (I));
+      end loop;
+
       declare
          Raw : constant AAA.Processes.Result :=
               AAA.Processes.Run
-                (AAA.Strings
-                 .To_Vector ("curl")
-                 .Append ("-v")
-                 .Append ("-i")
+                (Curl_Args
                  .Append (URL
                           & (if (for some C of URL => C = '?')
                              then '&'
                              else '?')
-                          & Arguments.Data.Flatten ("&")),
+                          & To_URL_Args (Arguments.Data)),
                  Raise_On_Error => False);
       begin
          if Raw.Exit_Code /= 0 then
