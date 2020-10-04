@@ -1,2 +1,4 @@
 # minirest
-Minimalistic REST Ada client library
+Minimalistic REST Ada client library.
+
+Depends on `curl`.
