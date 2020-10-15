@@ -20,5 +20,8 @@ jobs:
         sudo apt-get update && 
         sudo apt-get install gnat gprbuild
 
+    - name: Set up Alire
+      uses: alire-project/setup-alire@latest-stable
+
     - name: Build
-      run: gprbuild -j0 -p
+      run: alr update -n && alr build
