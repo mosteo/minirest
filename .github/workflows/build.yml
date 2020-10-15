@@ -25,6 +25,6 @@ jobs:
 
     - name: Build
       run: |
-        alr update -n 
+        alr update -f -n    # force to accept curl missing
         alr with --versions
         alr build
