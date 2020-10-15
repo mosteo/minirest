@@ -1,10 +1,10 @@
 name = "minirest"
-description = "Shiny new project"
-version = "0.0.0"
+description = "Minimalistic Ada REST client library"
+version = "0.1.0"
 
-authors = ["Al O'Reilly O\"Raro"]
-maintainers = ["Al O'Reilly O\"Raro <alejandro@mosteo.com>"]
+authors = ["Alejandro R. Mosteo"]
+maintainers = ["alejandro@mosteo.com"]
 maintainers-logins = ["mosteo"]
 
-[[depends-on]]  # This line was added by `alr with`
-aaa = "*"  # This line was added by `alr with`
+[[depends-on]]
+aaa = "*"
