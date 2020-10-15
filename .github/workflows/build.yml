@@ -24,4 +24,7 @@ jobs:
       uses: alire-project/setup-alire@latest-stable
 
     - name: Build
-      run: alr update -n && alr build
+      run: |
+        alr update -n 
+        alr with --versions
+        alr build
