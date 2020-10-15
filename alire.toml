@@ -7,4 +7,4 @@ maintainers = ["alejandro@mosteo.com"]
 maintainers-logins = ["mosteo"]
 
 [[depends-on]]
-aaa = "*"
+aaa = "~0.2.1"
