@@ -121,11 +121,14 @@ package body Minirest is
          Raw : constant AAA.Processes.Result :=
               AAA.Processes.Run
                 (Curl_Args
-                 .Append (URL
-                          & (if (for some C of URL => C = '?')
-                             then '&'
-                             else '?')
-                          & To_URL_Args (Arguments.Data)),
+                 .Append
+                   (URL
+                    & (if Arguments.Data.Is_Empty
+                      then ""
+                      elsif (for some C of URL => C = '?')
+                      then "&"
+                      else "?")
+                    & To_URL_Args (Arguments.Data)),
                  Raise_On_Error => False);
       begin
          if Raw.Exit_Code /= 0 then
