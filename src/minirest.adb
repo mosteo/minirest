@@ -103,7 +103,7 @@ package body Minirest is
       Curl_Args : AAA.Strings.Vector :=
                     AAA.Strings
                       .To_Vector ("curl")
-                      .Append ("-v")
+                      .Append ("-s")
                       .Append ("-i");
    begin
       if Curl in null then
