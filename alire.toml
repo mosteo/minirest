@@ -1,6 +1,6 @@
 name = "minirest"
 description = "Minimalist Ada REST client library"
-version = "0.2-dev"
+version = "0.2"
 
 authors = ["Alejandro R. Mosteo"]
 maintainers = ["alejandro@mosteo.com"]
@@ -11,5 +11,5 @@ tags = ["rest"]
 website = "https://github.com/mosteo/minirest"
 
 [[depends-on]]
-aaa = "~0.2.1"
+aaa = "~0.2.1|~0.3"
 curl = "*"

@@ -1,5 +1,4 @@
-obj/
-lib/
-alire/
-
 alire.lock
+/obj/
+/lib/
+/alire/
