@@ -17,15 +17,29 @@ package Minirest is
 
    function "and" (L : Parameters; R : Parameters) return Parameters;
 
-   function "=" (Key, Value : String) return Parameters;
+   function "=" (Key : String; Value : String)  return Parameters;
+   function "=" (Key : String; Value : Boolean) return Parameters;
+
+   function Image (These : Parameters) return String;
+
+   type Map is new AAA.Strings.Map with null record;
+
+   overriding
+   function Contains (This : Map; Key : String) return Boolean;
+   --  Case insensitive
+
+   function Get (This : Map; Key : String) return String;
+   --  Case insensitive
+
+   subtype Vector is AAA.Strings.Vector;
 
    type Response (Status : Status_Kinds; Status_Length : Natural) is tagged
       record
          Status_Line : String (1 .. Status_Length);
          Status_Code : Positive range 100 .. 599;
-         Raw_Headers : AAA.Strings.Vector; -- all lines containing headers
-         Headers     : AAA.Strings.Map;
-         Content     : AAA.Strings.Vector; -- all lines containing the response
+         Raw_Headers : Vector; -- all lines containing headers
+         Headers     : Map;
+         Content     : Vector; -- all lines containing the response
       end record;
 
    procedure Check (This : Response)
@@ -43,12 +57,30 @@ package Minirest is
    --  Use GET to retrieve URL; may raise Rest_Error for unexpected situations.
    --  Headers are passed via -H switch to curl.
 
+   function Post (URL     : String;
+                  Data    : String     := ""; -- this can be anything
+                  Headers : Parameters := No_Arguments) -- these are Key: Val
+                  return Response;
+   --  Use POST on URL; data is passed with -d
+
+   type Parameter_Encodings is (JSON); -- Only one supported for now
+
+   function Post (URL      : String;
+                  Encoding : Parameter_Encodings := JSON;
+                  Data     : Parameters := No_Arguments;
+                  Headers  : Parameters := No_Arguments)
+                  return Response;
+   --  Convert data into JSON before calling Post. This is pretty basic at the
+   --  time and won't do any escaping or whatever. Also there are no arrays or
+   --  nested maps.
+
 private
 
    type Parameters is record
-      Data : AAA.Strings.Map;
+      Data  : Map;
+      Types : Map; -- untyped horror: either string or boolean (lowercase)
    end record;
 
-   No_Arguments : constant Parameters := (Data => AAA.Strings.Empty_Map);
+   No_Arguments : constant Parameters := (others => <>);
 
 end Minirest;
