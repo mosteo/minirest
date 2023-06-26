@@ -23,10 +23,15 @@ package Minirest is
       record
          Status_Line : String (1 .. Status_Length);
          Status_Code : Positive range 100 .. 599;
-         Raw_Headers : AAA.Strings.Vector;
+         Raw_Headers : AAA.Strings.Vector; -- all lines containing headers
          Headers     : AAA.Strings.Map;
-         Content     : AAA.Strings.Vector;
+         Content     : AAA.Strings.Vector; -- all lines containing the response
       end record;
+
+   procedure Check (This : Response)
+     with Post => This.Succeeded
+     or else raise Rest_Error with "REST error" & This.Status_Code'Image;
+   --  NOOP unless not Succeeded
 
    function Succeeded (This : Response) return Boolean
    is (This.Status = Success);

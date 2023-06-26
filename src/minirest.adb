@@ -7,6 +7,17 @@ package body Minirest is
 
    package OS renames GNAT.OS_Lib;
 
+   -----------
+   -- Check --
+   -----------
+
+   procedure Check (This : Response) is
+   begin
+      if This.Succeeded then
+         raise Rest_Error with "REST error" & This.Status_Code'Image;
+      end if;
+   end Check;
+
    ------------------
    -- Code_To_Kind --
    ------------------
@@ -20,9 +31,9 @@ package body Minirest is
           when 500 .. 599 => Server_Error,
           when others     => raise Constraint_Error);
 
-   --------------
-   -- Encoding --
-   --------------
+   ------------
+   -- To_Hex --
+   ------------
 
    function To_Hex (Char : Character) return String is
       Hex : String (1 .. 6);
@@ -30,6 +41,10 @@ package body Minirest is
       Ada.Integer_Text_IO.Put (Hex, Character'Pos (Char), Base => 16);
       return Hex (4 .. 5);
    end To_Hex;
+
+   --------------
+   -- Encoding --
+   --------------
 
    function Encoding (Char : Character) return String
    is (case Char is
