@@ -1,6 +1,7 @@
 with AAA.Processes;
 with Ada.Strings.Unbounded;
 with Ada.Integer_Text_IO;
+--  with GNAT.IO;
 with GNAT.OS_Lib;
 
 --------------
@@ -111,6 +112,9 @@ package body Minirest is
          for I in R.Data.Iterate loop
             Result.Data.Insert (AAA.Strings.Maps.Key (I), R.Data (I));
          end loop;
+         for I in R.Types.Iterate loop
+            Result.Types.Insert (AAA.Strings.Maps.Key (I), R.Types (I));
+         end loop;
       end return;
    end "and";
 
@@ -181,8 +185,7 @@ package body Minirest is
       for I in Data.Data.Iterate loop
          Append (Result,
                  Q (Key (I)) & ":"
-                 & (if not Data.Types.Contains (Key (I))
-                     or else Data.Types (Key (I)) = "string"
+                 & (if Data.Types (Key (I)) = "string"
                    then Q (Data.Data (I))
                    else Data.Data (I)));
 
@@ -242,6 +245,8 @@ package body Minirest is
          R.Status_Line := Status_Line;
          R.Status_Code := Code;
 
+     --  GNAT.IO.Put_Line ("RAW RESPONSE: " & Raw.Output.Flatten (ASCII.LF));
+
          for I in Raw.Output.First_Index + 1 ..
            Raw.Output.Last_Index
          loop
@@ -255,9 +260,19 @@ package body Minirest is
 
                if In_Headers then
                   R.Raw_Headers.Append (Line);
-                  R.Headers.Insert (AAA.Strings.Head (Line, ':'),
-                                    AAA.Strings.Trim
-                                      (AAA.Strings.Tail (Line, ':')));
+                  declare
+                     Key : constant String := AAA.Strings.Head (Line, ':');
+                     Val : constant String :=
+                             AAA.Strings.Trim (AAA.Strings.Tail (Line, ':'));
+                  begin
+                     if R.Headers.Contains (Key) then
+                        --  Append in case of duplicate headers. Dirty, as
+                        --  values might need deduplication too.
+                        R.Headers.Include (Key, R.Headers (Key) & "," & Val);
+                     else
+                        R.Headers.Insert (Key, Val);
+                     end if;
+                  end;
                elsif Skip then
                   Skip := False;
                else

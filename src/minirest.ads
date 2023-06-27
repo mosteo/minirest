@@ -76,10 +76,16 @@ package Minirest is
 
 private
 
+   package Maps renames AAA.Strings.Maps;
+
    type Parameters is record
       Data  : Map;
       Types : Map; -- untyped horror: either string or boolean (lowercase)
-   end record;
+   end record
+     with Type_Invariant =>
+       (for all I in Parameters.Data.Iterate =>
+          (for some J in Parameters.Types.Iterate =>
+                 Maps.Key (I) = Maps.Key (J)));
 
    No_Arguments : constant Parameters := (others => <>);
 
