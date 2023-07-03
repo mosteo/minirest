@@ -245,7 +245,7 @@ package body Minirest is
          R.Status_Line := Status_Line;
          R.Status_Code := Code;
 
-     --  GNAT.IO.Put_Line ("RAW RESPONSE: " & Raw.Output.Flatten (ASCII.LF));
+      --  GNAT.IO.Put_Line ("RAW RESPONSE: " & Raw.Output.Flatten (ASCII.LF));
 
          for I in Raw.Output.First_Index + 1 ..
            Raw.Output.Last_Index
