@@ -12,6 +12,12 @@ package body Minirest is
 
    package OS renames GNAT.OS_Lib;
 
+   package Types is
+      Int  : constant String := "integer";
+      Str  : constant String := "string";
+      Bool : constant String := "boolean";
+   end Types;
+
    -----------
    -- Check --
    -----------
@@ -126,7 +132,7 @@ package body Minirest is
    begin
       return P : Parameters do
          P.Data.Insert  (Key, Value);
-         P.Types.Insert (Key, "string");
+         P.Types.Insert (Key, Types.Str);
       end return;
    end "=";
 
@@ -139,7 +145,20 @@ package body Minirest is
    begin
       return P : Parameters do
          P.Data.Insert  (Key, To_Lower_Case (Value'Image));
-         P.Types.Insert (Key, "boolean");
+         P.Types.Insert (Key, Types.Bool);
+      end return;
+   end "=";
+
+   ---------
+   -- "=" --
+   ---------
+
+   function "=" (Key : String; Value : Integer) return Parameters is
+      use AAA.Strings;
+   begin
+      return P : Parameters do
+         P.Data.Insert  (Key, Trim (Value'Image));
+         P.Types.Insert (Key, Types.Int);
       end return;
    end "=";
 
@@ -185,7 +204,7 @@ package body Minirest is
       for I in Data.Data.Iterate loop
          Append (Result,
                  Q (Key (I)) & ":"
-                 & (if Data.Types (Key (I)) = "string"
+                 & (if Data.Types (Key (I)) = Types.Str
                    then Q (Data.Data (I))
                    else Data.Data (I)));
 

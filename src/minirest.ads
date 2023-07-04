@@ -19,6 +19,7 @@ package Minirest is
 
    function "=" (Key : String; Value : String)  return Parameters;
    function "=" (Key : String; Value : Boolean) return Parameters;
+   function "=" (Key : String; Value : Integer) return Parameters;
 
    function Image (These : Parameters) return String;
 
