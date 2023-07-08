@@ -1,5 +1,7 @@
 with AAA.Strings;
 
+with Ada.Strings.UTF_Encoding;
+
 package Minirest is
 
    Rest_Error : exception;
@@ -11,6 +13,8 @@ package Minirest is
                          Redirect,      -- 3xx
                          Client_Error,  -- 4xx
                          Server_Error); -- 5xx
+
+   subtype UTF_8_String is Ada.Strings.UTF_Encoding.UTF_8_String;
 
    type Parameters is private;
    --  A collection of arguments of type key + value
@@ -69,15 +73,20 @@ package Minirest is
 
    type Parameter_Encodings is (JSON); -- Only one supported for now
 
+   type Encoder is access function (S : UTF_8_String) return String;
+   --  Data encodings for request bodies usually will require escaping of
+   --  strings. See E.g. GNATCOLL.JSON.Utility.
+
    function Post (URL      : String;
                   Encoding : Parameter_Encodings := JSON;
+                  Escape   : Encoder := null;
                   Data     : Parameters := No_Arguments;
                   Headers  : Parameters := No_Arguments;
                   Kind     : Request_Kinds := POST)
                   return Response;
-   --  Convert data into JSON before calling Post. This is pretty basic at the
-   --  time and won't do any escaping or whatever. Also there are no arrays or
-   --  nested maps.
+   --  Convert data into JSON before calling Post. This is pretty basic at
+   --  the time and won't do any escaping or whatever unless Escape which is
+   --  encoding-dependent is provided. Also there are no arrays or nested maps.
 
    function Patch (URL     : String;
                    Data    : String     := ""; -- this can be anything
@@ -86,6 +95,7 @@ package Minirest is
 
    function Patch (URL      : String;
                    Encoding : Parameter_Encodings := JSON;
+                   Escape   : Encoder := null;
                    Data     : Parameters := No_Arguments;
                    Headers  : Parameters := No_Arguments)
                    return Response;
@@ -124,11 +134,13 @@ private
 
    function Patch (URL      : String;
                    Encoding : Parameter_Encodings := JSON;
+                   Escape   : Encoder := null;
                    Data     : Parameters := No_Arguments;
                    Headers  : Parameters := No_Arguments)
                    return Response
    is (Post (URL      => URL,
              Encoding => Encoding,
+             Escape   => Escape,
              Data     => Data,
              Headers  => Headers,
              Kind     => PATCH));

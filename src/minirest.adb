@@ -192,7 +192,7 @@ package body Minirest is
    -- To_JSON --
    -------------
 
-   function To_JSON (Data : Parameters) return String
+   function To_JSON (Data : Parameters; Escape : Encoder) return String
    is
 
       function Q (S : String) return String is ("""" & S & """");
@@ -205,7 +205,9 @@ package body Minirest is
          Append (Result,
                  Q (Key (I)) & ":"
                  & (if Data.Types (Key (I)) = Types.Str
-                   then Q (Data.Data (I))
+                   then Q (if Escape /= null
+                           then Escape (Data.Data (I))
+                           else Data.Data (I))
                    else Data.Data (I)));
 
          if I /= Data.Data.Last then
@@ -224,7 +226,7 @@ package body Minirest is
    function Image (These : Parameters) return String
    is
    begin
-      return To_JSON (These);
+      return To_JSON (These, null);
    end Image;
 
    ----------------------------
@@ -417,6 +419,7 @@ package body Minirest is
 
    function Post (URL      : String;
                   Encoding : Parameter_Encodings := JSON;
+                  Escape   : Encoder := null;
                   Data     : Parameters := No_Arguments;
                   Headers  : Parameters := No_Arguments;
                   Kind     : Request_Kinds := POST)
@@ -426,7 +429,7 @@ package body Minirest is
       return Post (URL,
                    Data    =>
                      (case Encoding is
-                       when JSON => To_JSON (Data)),
+                         when JSON => To_JSON (Data, Escape)),
                    Headers => Headers,
                    Kind    => Kind);
    end Post;
