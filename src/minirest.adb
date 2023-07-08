@@ -370,11 +370,12 @@ package body Minirest is
 
    function Post (URL     : String;
                   Data    : String     := ""; -- this can be anything
-                  Headers : Parameters := No_Arguments) -- these are Key: Val
+                  Headers : Parameters := No_Arguments; -- these are Key: Val
+                  Kind    : Request_Kinds := POST)
                   return Response
    is
       use all type Vector;
-      Curl_Args : Vector := Common_Args & "-X" & "POST";
+      Curl_Args : Vector := Common_Args & "-X" & Kind'Image;
    begin
       if Curl in null then
          raise Rest_Error with "Could not find 'curl' tool in path";
@@ -417,14 +418,17 @@ package body Minirest is
    function Post (URL      : String;
                   Encoding : Parameter_Encodings := JSON;
                   Data     : Parameters := No_Arguments;
-                  Headers  : Parameters := No_Arguments)
+                  Headers  : Parameters := No_Arguments;
+                  Kind     : Request_Kinds := POST)
                   return Response
    is
    begin
       return Post (URL,
-                   (case Encoding is
+                   Data    =>
+                     (case Encoding is
                        when JSON => To_JSON (Data)),
-                   Headers => Headers);
+                   Headers => Headers,
+                   Kind    => Kind);
    end Post;
 
 end Minirest;

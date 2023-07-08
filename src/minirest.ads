@@ -4,6 +4,8 @@ package Minirest is
 
    Rest_Error : exception;
 
+   type Request_Kinds is (GET, POST, PATCH);
+
    type Status_Kinds is (Informative,   -- 1xx
                          Success,       -- 2xx
                          Redirect,      -- 3xx
@@ -60,20 +62,33 @@ package Minirest is
 
    function Post (URL     : String;
                   Data    : String     := ""; -- this can be anything
-                  Headers : Parameters := No_Arguments) -- these are Key: Val
+                  Headers : Parameters := No_Arguments; -- these are Key: Val
+                  Kind    : Request_Kinds := POST)
                   return Response;
-   --  Use POST on URL; data is passed with -d
+   --  Use POST/PATCH on URL; data is passed with -d
 
    type Parameter_Encodings is (JSON); -- Only one supported for now
 
    function Post (URL      : String;
                   Encoding : Parameter_Encodings := JSON;
                   Data     : Parameters := No_Arguments;
-                  Headers  : Parameters := No_Arguments)
+                  Headers  : Parameters := No_Arguments;
+                  Kind     : Request_Kinds := POST)
                   return Response;
    --  Convert data into JSON before calling Post. This is pretty basic at the
    --  time and won't do any escaping or whatever. Also there are no arrays or
    --  nested maps.
+
+   function Patch (URL     : String;
+                   Data    : String     := ""; -- this can be anything
+                   Headers : Parameters := No_Arguments) -- these are Key: Val
+                   return Response;
+
+   function Patch (URL      : String;
+                   Encoding : Parameter_Encodings := JSON;
+                   Data     : Parameters := No_Arguments;
+                   Headers  : Parameters := No_Arguments)
+                   return Response;
 
 private
 
@@ -89,5 +104,33 @@ private
                  Maps.Key (I) = Maps.Key (J)));
 
    No_Arguments : constant Parameters := (others => <>);
+
+   -----------
+   -- Patch --
+   -----------
+
+   function Patch (URL     : String;
+                   Data    : String     := ""; -- this can be anything
+                   Headers : Parameters := No_Arguments) -- these are Key: Val
+                   return Response
+   is (Post (URL     => URL,
+             Data    => Data,
+             Headers => Headers,
+             Kind    => PATCH));
+
+   -----------
+   -- Patch --
+   -----------
+
+   function Patch (URL      : String;
+                   Encoding : Parameter_Encodings := JSON;
+                   Data     : Parameters := No_Arguments;
+                   Headers  : Parameters := No_Arguments)
+                   return Response
+   is (Post (URL      => URL,
+             Encoding => Encoding,
+             Data     => Data,
+             Headers  => Headers,
+             Kind     => PATCH));
 
 end Minirest;
