@@ -205,9 +205,9 @@ package body Minirest is
          Append (Result,
                  Q (Key (I)) & ":"
                  & (if Data.Types (Key (I)) = Types.Str
-                   then Q (if Escape /= null
-                           then Escape (Data.Data (I))
-                           else Data.Data (I))
+                   then (if Escape /= null
+                         then Escape (Data.Data (I))
+                         else Q (Data.Data (I)))
                    else Data.Data (I)));
 
          if I /= Data.Data.Last then
@@ -223,10 +223,12 @@ package body Minirest is
    -- Image --
    -----------
 
-   function Image (These : Parameters) return String
+   function Image (These  : Parameters;
+                   Escape : Encoder := null)
+                   return String
    is
    begin
-      return To_JSON (These, null);
+      return To_JSON (These, Escape);
    end Image;
 
    ----------------------------

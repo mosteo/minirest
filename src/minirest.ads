@@ -27,8 +27,6 @@ package Minirest is
    function "=" (Key : String; Value : Boolean) return Parameters;
    function "=" (Key : String; Value : Integer) return Parameters;
 
-   function Image (These : Parameters) return String;
-
    type Map is new AAA.Strings.Map with null record;
 
    overriding
@@ -85,8 +83,10 @@ package Minirest is
                   Kind     : Request_Kinds := POST)
                   return Response;
    --  Convert data into JSON before calling Post. This is pretty basic at
-   --  the time and won't do any escaping or whatever unless Escape which is
-   --  encoding-dependent is provided. Also there are no arrays or nested maps.
+   --  the time and won't do any escaping or whatever unless Escape which
+   --  is encoding-dependent is provided. If Escape is given, it MUST QUOTE
+   --  strings if the encoding requires it, in addition to any internal
+   --  sequence escaping. Also there are no arrays or nested maps.
 
    function Patch (URL     : String;
                    Data    : String     := ""; -- this can be anything
@@ -99,6 +99,10 @@ package Minirest is
                    Data     : Parameters := No_Arguments;
                    Headers  : Parameters := No_Arguments)
                    return Response;
+
+   function Image (These  : Parameters;
+                   Escape : Encoder := null)
+                   return String;
 
 private
 
