@@ -258,6 +258,7 @@ package body Minirest is
 
    function To_Response (Status_Line : String;
                          Code        : Integer;
+                         Start       : Positive;
                          Raw         : AAA.Processes.Result)
                          return Response
    is
@@ -270,7 +271,7 @@ package body Minirest is
 
       --  GNAT.IO.Put_Line ("RAW RESPONSE: " & Raw.Output.Flatten (ASCII.LF));
 
-         for I in Raw.Output.First_Index + 1 ..
+         for I in Start + 1 ..
            Raw.Output.Last_Index
          loop
             declare
@@ -304,6 +305,54 @@ package body Minirest is
             end;
          end loop;
       end return;
+   end To_Response;
+
+   --------------------------
+   -- Final_Response_Start --
+   --------------------------
+
+   --  curl -i may output several header blocks before the final response:
+   --  the reply to a proxy CONNECT ("HTTP/1.1 200 Connection established")
+   --  when tunneling HTTPS through a proxy, and 1xx informational responses
+   --  such as "100 Continue". Each block ends with an empty line. Skip every
+   --  block followed by another status line, and return the index of the
+   --  status line of the final response.
+
+   function Final_Response_Start (Output : AAA.Strings.Vector)
+                                  return Positive
+   is
+      Start : Positive := Output.First_Index;
+      I     : Positive := Start + 1;
+   begin
+      while I < Output.Last_Index loop
+         if Output (I) = "" then
+            exit when not AAA.Strings.Has_Prefix (Output (I + 1), "HTTP/");
+            Start := I + 1;
+         end if;
+         I := I + 1;
+      end loop;
+
+      return Start;
+   end Final_Response_Start;
+
+   -----------------
+   -- To_Response --
+   -----------------
+
+   function To_Response (Raw : AAA.Processes.Result) return Response is
+   begin
+      if Raw.Output.Is_Empty then
+         raise Rest_Error with "Empty response from curl";
+      end if;
+
+      declare
+         Start       : constant Positive := Final_Response_Start (Raw.Output);
+         Status_Line : constant String   := Raw.Output (Start);
+         Code        : constant Integer  :=
+                         Identify_Response_Code (Status_Line);
+      begin
+         return To_Response (Status_Line, Code, Start, Raw);
+      end;
    end To_Response;
 
    ---------
@@ -358,13 +407,7 @@ package body Minirest is
               "curl exited with non-zero error code:" & Raw.Exit_Code'Image;
          end if;
 
-         declare
-            Status_Line : constant String := Raw.Output.First_Element;
-            Code        : constant Integer :=
-                            Identify_Response_Code (Status_Line);
-         begin
-            return To_Response (Status_Line, Code, Raw);
-         end;
+         return To_Response (Raw);
       end;
    end Get;
 
@@ -405,13 +448,7 @@ package body Minirest is
               "curl exited with non-zero error code:" & Raw.Exit_Code'Image;
          end if;
 
-         declare
-            Status_Line : constant String := Raw.Output.First_Element;
-            Code        : constant Integer :=
-                            Identify_Response_Code (Status_Line);
-         begin
-            return To_Response (Status_Line, Code, Raw);
-         end;
+         return To_Response (Raw);
       end;
    end Post;
 
