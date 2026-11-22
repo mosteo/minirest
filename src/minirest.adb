@@ -1,11 +1,33 @@
 with AAA.Processes;
 with Ada.Strings.Unbounded;
 with Ada.Integer_Text_IO;
+--  with GNAT.IO;
 with GNAT.OS_Lib;
+
+--------------
+-- Minirest --
+--------------
 
 package body Minirest is
 
    package OS renames GNAT.OS_Lib;
+
+   package Types is
+      Int  : constant String := "integer";
+      Str  : constant String := "string";
+      Bool : constant String := "boolean";
+   end Types;
+
+   -----------
+   -- Check --
+   -----------
+
+   procedure Check (This : Response) is
+   begin
+      if This.Succeeded then
+         raise Rest_Error with "REST error" & This.Status_Code'Image;
+      end if;
+   end Check;
 
    ------------------
    -- Code_To_Kind --
@@ -21,8 +43,37 @@ package body Minirest is
           when others     => raise Constraint_Error);
 
    --------------
-   -- Encoding --
+   -- Contains --
    --------------
+
+   overriding
+   function Contains (This : Map; Key : String) return Boolean
+   is
+      use AAA.Strings;
+   begin
+      return (for some I in This.Iterate =>
+                To_Lower_Case (Maps.Key (I)) = To_Lower_Case (Key));
+   end Contains;
+
+   ---------
+   -- Get --
+   ---------
+
+   function Get (This : Map; Key : String) return String is
+      use AAA.Strings;
+   begin
+      for I in This.Iterate loop
+         if To_Lower_Case (Maps.Key (I)) = To_Lower_Case (Key) then
+            return This (I);
+         end if;
+      end loop;
+
+      raise Constraint_Error with "key not found: " & Key;
+   end Get;
+
+   ------------
+   -- To_Hex --
+   ------------
 
    function To_Hex (Char : Character) return String is
       Hex : String (1 .. 6);
@@ -30,6 +81,10 @@ package body Minirest is
       Ada.Integer_Text_IO.Put (Hex, Character'Pos (Char), Base => 16);
       return Hex (4 .. 5);
    end To_Hex;
+
+   --------------
+   -- Encoding --
+   --------------
 
    function Encoding (Char : Character) return String
    is (case Char is
@@ -63,6 +118,9 @@ package body Minirest is
          for I in R.Data.Iterate loop
             Result.Data.Insert (AAA.Strings.Maps.Key (I), R.Data (I));
          end loop;
+         for I in R.Types.Iterate loop
+            Result.Types.Insert (AAA.Strings.Maps.Key (I), R.Types (I));
+         end loop;
       end return;
    end "and";
 
@@ -73,9 +131,229 @@ package body Minirest is
    function "=" (Key, Value : String) return Parameters is
    begin
       return P : Parameters do
-         P.Data.Insert (Key, Value);
+         P.Data.Insert  (Key, Value);
+         P.Types.Insert (Key, Types.Str);
       end return;
    end "=";
+
+   ---------
+   -- "=" --
+   ---------
+
+   function "=" (Key : String; Value : Boolean) return Parameters is
+      use AAA.Strings;
+   begin
+      return P : Parameters do
+         P.Data.Insert  (Key, To_Lower_Case (Value'Image));
+         P.Types.Insert (Key, Types.Bool);
+      end return;
+   end "=";
+
+   ---------
+   -- "=" --
+   ---------
+
+   function "=" (Key : String; Value : Integer) return Parameters is
+      use AAA.Strings;
+   begin
+      return P : Parameters do
+         P.Data.Insert  (Key, Trim (Value'Image));
+         P.Types.Insert (Key, Types.Int);
+      end return;
+   end "=";
+
+   -----------------
+   -- Common_Args --
+   -----------------
+
+   function Common_Args return Vector
+   is (AAA.Strings
+       .To_Vector ("curl")
+       .Append ("-s")
+       .Append ("-i"));
+
+   --------------------
+   -- To_Header_Args --
+   --------------------
+
+   function To_Header_Args (Headers : Parameters) return Vector
+   is
+      Result : Vector;
+   begin
+      for I in Headers.Data.Iterate loop
+         Result.Append ("-H");
+         Result.Append (AAA.Strings.Maps.Key (I) & ": " & Headers.Data (I));
+      end loop;
+
+      return Result;
+   end To_Header_Args;
+
+   -------------
+   -- To_JSON --
+   -------------
+
+   function To_JSON (Data : Parameters; Escape : Encoder) return String
+   is
+
+      function Q (S : String) return String is ("""" & S & """");
+
+      use AAA.Strings.Maps;
+      use Ada.Strings.Unbounded;
+      Result : Unbounded_String := To_Unbounded_String ("{");
+   begin
+      for I in Data.Data.Iterate loop
+         Append (Result,
+                 Q (Key (I)) & ":"
+                 & (if Data.Types (Key (I)) = Types.Str
+                   then (if Escape /= null
+                         then Escape (Data.Data (I))
+                         else Q (Data.Data (I)))
+                   else Data.Data (I)));
+
+         if I /= Data.Data.Last then
+            Append (Result, ",");
+         end if;
+      end loop;
+
+      Append (Result, "}");
+      return To_String (Result);
+   end To_JSON;
+
+   -----------
+   -- Image --
+   -----------
+
+   function Image (These  : Parameters;
+                   Escape : Encoder := null)
+                   return String
+   is
+   begin
+      return To_JSON (These, Escape);
+   end Image;
+
+   ----------------------------
+   -- Identify_Response_Code --
+   ----------------------------
+
+   function Identify_Response_Code (Status_Line : String) return Integer is
+      Code : Integer := -1;
+   begin
+      for I in Status_Line'Range loop
+         if Status_Line (I) = ' ' then
+            Code := Integer'Value (Status_Line (I + 1 .. I + 4));
+            exit;
+         end if;
+      end loop;
+
+      if Code = -1 then
+         raise Rest_Error with "Malformed status line: " & Status_Line;
+      end if;
+
+      return Code;
+   end Identify_Response_Code;
+
+   -----------------
+   -- To_Response --
+   -----------------
+
+   function To_Response (Status_Line : String;
+                         Code        : Integer;
+                         Start       : Positive;
+                         Raw         : AAA.Processes.Result)
+                         return Response
+   is
+      In_Headers  : Boolean := True;
+      Skip        : Boolean := False;
+   begin
+      return R : Response (Code_To_Kind (Code), Status_Line'Length) do
+         R.Status_Line := Status_Line;
+         R.Status_Code := Code;
+
+      --  GNAT.IO.Put_Line ("RAW RESPONSE: " & Raw.Output.Flatten (ASCII.LF));
+
+         for I in Start + 1 ..
+           Raw.Output.Last_Index
+         loop
+            declare
+               Line : constant String := Raw.Output (I);
+            begin
+               if In_Headers and then Line = "" then
+                  In_Headers := False;
+                  Skip       := True;
+               end if;
+
+               if In_Headers then
+                  R.Raw_Headers.Append (Line);
+                  declare
+                     Key : constant String := AAA.Strings.Head (Line, ':');
+                     Val : constant String :=
+                             AAA.Strings.Trim (AAA.Strings.Tail (Line, ':'));
+                  begin
+                     if R.Headers.Contains (Key) then
+                        --  Append in case of duplicate headers. Dirty, as
+                        --  values might need deduplication too.
+                        R.Headers.Include (Key, R.Headers (Key) & "," & Val);
+                     else
+                        R.Headers.Insert (Key, Val);
+                     end if;
+                  end;
+               elsif Skip then
+                  Skip := False;
+               else
+                  R.Content.Append (Line);
+               end if;
+            end;
+         end loop;
+      end return;
+   end To_Response;
+
+   --------------------------
+   -- Final_Response_Start --
+   --------------------------
+
+   --  curl -i may output several header blocks before the final response:
+   --  the reply to a proxy CONNECT ("HTTP/1.1 200 Connection established")
+   --  when tunneling HTTPS through a proxy, and 1xx informational responses
+   --  such as "100 Continue". Each block ends with an empty line. Skip every
+   --  block followed by another status line, and return the index of the
+   --  status line of the final response.
+
+   function Final_Response_Start (Output : AAA.Strings.Vector)
+                                  return Positive
+   is
+      Start : Positive := Output.First_Index;
+      I     : Positive := Start + 1;
+   begin
+      while I < Output.Last_Index loop
+         if Output (I) = "" then
+            exit when not AAA.Strings.Has_Prefix (Output (I + 1), "HTTP/");
+            Start := I + 1;
+         end if;
+         I := I + 1;
+      end loop;
+
+      return Start;
+   end Final_Response_Start;
+
+   -----------------
+   -- To_Response --
+   -----------------
+
+   function To_Response (Raw : AAA.Processes.Result) return Response is
+   begin
+      if Raw.Output.Is_Empty then
+         raise Rest_Error with "Empty response from curl";
+      end if;
+
+      declare
+         Start       : constant Positive := Final_Response_Start (Raw.Output);
+         Status_Line : constant String   := Raw.Output (Start);
+         Code        : constant Integer  :=
+                         Identify_Response_Code (Status_Line);
+      begin
+         return To_Response (Status_Line, Code, Start, Raw);
+      end;
+   end To_Response;
 
    ---------
    -- Get --
@@ -89,7 +367,7 @@ package body Minirest is
                     return Response
    is
 
-      function To_URL_Args (Map : AAA.Strings.Map) return String is
+      function To_URL_Args (Map : Minirest.Map) return String is
          use AAA.Strings.Maps;
          Flat : AAA.Strings.Vector;
       begin
@@ -100,11 +378,7 @@ package body Minirest is
          return Flat.Flatten ('&');
       end To_URL_Args;
 
-      Curl_Args : AAA.Strings.Vector :=
-                    AAA.Strings
-                      .To_Vector ("curl")
-                      .Append ("-s")
-                      .Append ("-i");
+      Curl_Args : Vector := Common_Args;
    begin
       if Curl in null then
          raise Rest_Error with "Could not find 'curl' tool in path";
@@ -112,10 +386,7 @@ package body Minirest is
 
       --  Add request headers
 
-      for I in Headers.Data.Iterate loop
-         Curl_Args.Append ("-H");
-         Curl_Args.Append (AAA.Strings.Maps.Key (I) & ": " & Headers.Data (I));
-      end loop;
+      Curl_Args := Curl_Args.Append (To_Header_Args (Headers));
 
       declare
          Raw : constant AAA.Processes.Result :=
@@ -136,58 +407,70 @@ package body Minirest is
               "curl exited with non-zero error code:" & Raw.Exit_Code'Image;
          end if;
 
-         declare
-            Status_Line : constant String := Raw.Output.First_Element;
-            Code        : Integer := -1;
-            In_Headers  : Boolean := True;
-            Skip        : Boolean := False;
-         begin
-
-            --  Identify code
-
-            for I in Status_Line'Range loop
-               if Status_Line (I) = ' ' then
-                  Code := Integer'Value (Status_Line (I + 1 .. I + 4));
-                  exit;
-               end if;
-            end loop;
-
-            if Code = -1 then
-               raise Rest_Error with "Malformed status line: " & Status_Line;
-            end if;
-
-            --  Fill response
-
-            return R : Response (Code_To_Kind (Code), Status_Line'Length) do
-               R.Status_Line := Status_Line;
-               R.Status_Code := Code;
-
-               for I in Raw.Output.First_Index + 1 ..
-                 Raw.Output.Last_Index
-               loop
-                  declare
-                     Line : constant String := Raw.Output (I);
-                  begin
-                     if In_Headers and then Line = "" then
-                        In_Headers := False;
-                        Skip       := True;
-                     end if;
-
-                     if In_Headers then
-                        R.Raw_Headers.Append (Line);
-                        R.Headers.Insert (AAA.Strings.Head (Line, ':'),
-                                          AAA.Strings.Trim
-                                            (AAA.Strings.Tail (Line, ':')));
-                     elsif Skip then
-                        Skip := False;
-                     else
-                        R.Content.Append (Line);
-                     end if;
-                  end;
-               end loop;
-            end return;
-         end;
+         return To_Response (Raw);
       end;
    end Get;
+
+   ----------
+   -- Post --
+   ----------
+
+   function Post (URL     : String;
+                  Data    : String     := ""; -- this can be anything
+                  Headers : Parameters := No_Arguments; -- these are Key: Val
+                  Kind    : Request_Kinds := POST)
+                  return Response
+   is
+      use all type Vector;
+      Curl_Args : Vector := Common_Args & "-X" & Kind'Image;
+   begin
+      if Curl in null then
+         raise Rest_Error with "Could not find 'curl' tool in path";
+      end if;
+
+      --  Add request headers
+
+      Curl_Args := Curl_Args.Append (To_Header_Args (Headers));
+
+      declare
+         Raw : constant AAA.Processes.Result :=
+                 AAA.Processes.Run
+                   (Curl_Args
+                    .Append (URL)
+                    .Append
+                      (if Data /= ""
+                       then To_Vector ("-d") & Data
+                       else AAA.Strings.Empty_Vector),
+                    Raise_On_Error => False);
+      begin
+         if Raw.Exit_Code /= 0 then
+            raise Rest_Error with
+              "curl exited with non-zero error code:" & Raw.Exit_Code'Image;
+         end if;
+
+         return To_Response (Raw);
+      end;
+   end Post;
+
+   ----------
+   -- Post --
+   ----------
+
+   function Post (URL      : String;
+                  Encoding : Parameter_Encodings := JSON;
+                  Escape   : Encoder := null;
+                  Data     : Parameters := No_Arguments;
+                  Headers  : Parameters := No_Arguments;
+                  Kind     : Request_Kinds := POST)
+                  return Response
+   is
+   begin
+      return Post (URL,
+                   Data    =>
+                     (case Encoding is
+                         when JSON => To_JSON (Data, Escape)),
+                   Headers => Headers,
+                   Kind    => Kind);
+   end Post;
 
 end Minirest;
