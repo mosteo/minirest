@@ -1,6 +1,6 @@
 name = "minirest"
 description = "Minimalist Ada REST client library"
-version = "0.2"
+version = "0.3.0-dev"
 
 authors = ["Alejandro R. Mosteo"]
 maintainers = ["alejandro@mosteo.com"]
