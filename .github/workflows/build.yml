@@ -13,18 +13,13 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
-
-    - name: Set up GNAT toolchain
-      run: >
-        sudo apt-get update && 
-        sudo apt-get install gnat gprbuild
+      uses: actions/checkout@v7
 
     - name: Set up Alire
-      uses: alire-project/setup-alire@latest-stable
+      uses: alire-project/setup-alire@latest
 
     - name: Build
       run: |
-        alr update -f -n    # force to accept curl missing
+        alr --force -n update # force to accept curl missing
         alr with --versions
         alr build
